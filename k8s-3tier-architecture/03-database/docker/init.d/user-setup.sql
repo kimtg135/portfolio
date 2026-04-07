@@ -1,15 +1,16 @@
-CREATE DATABASE IF NOT EXISTS nginx_db;
-CREATE DATABASE IF NOT EXISTS fastapi_db;
-CREATE DATABASE IF NOT EXISTS slave_db;
-CREATE DATABASE IF NOT EXISTS proxy_db;
-CREATE DATABASE IF NOT EXISTS mot_db;
+-- 쇼핑몰 데이터베이스
+CREATE DATABASE IF NOT EXISTS shop_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
--- FIX: 사용자명 통일 (기존: slave1234 생성 후 slave에 권한 부여 → 불일치)
-CREATE USER IF NOT EXISTS 'slave'@'%' IDENTIFIED BY 'slave1234';
-GRANT REPLICATION SLAVE ON *.* TO 'slave'@'%';
+-- 복제 사용자
+CREATE USER IF NOT EXISTS 'repl_user'@'%' IDENTIFIED BY 'Repl_Secure_Pass_456';
+GRANT REPLICATION SLAVE ON *.* TO 'repl_user'@'%';
 
-CREATE USER IF NOT EXISTS 'app'@'%' IDENTIFIED BY 'app1234';
-GRANT ALL PRIVILEGES ON fastapi_db.* TO 'app'@'%';
-GRANT ALL PRIVILEGES ON nginx_db.* TO 'app'@'%';
+-- 애플리케이션 사용자
+CREATE USER IF NOT EXISTS 'shop_user'@'%' IDENTIFIED BY 'Shop_Pass_456';
+GRANT ALL PRIVILEGES ON shop_db.* TO 'shop_user'@'%';
+
+-- ProxySQL 모니터 사용자
+CREATE USER IF NOT EXISTS 'proxysql'@'%' IDENTIFIED BY 'proxysql_pass';
+GRANT USAGE ON *.* TO 'proxysql'@'%';
 
 FLUSH PRIVILEGES;

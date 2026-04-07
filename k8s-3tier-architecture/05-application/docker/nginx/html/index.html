@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shop - 쇼핑몰</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f5f5f5;
+        }
+
+        header {
+            background: #1a1a2e;
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h1 {
+            font-size: 1.5rem;
+        }
+
+        nav a {
+            color: #e0e0e0;
+            text-decoration: none;
+            margin-left: 1.5rem;
+        }
+
+        nav a:hover {
+            color: white;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .search-bar {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .search-bar input {
+            flex: 1;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+
+        .search-bar button {
+            padding: 0.75rem 1.5rem;
+            background: #1a1a2e;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .products {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .product-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+        }
+
+        .product-card:hover {
+            transform: translateY(-4px);
+        }
+
+        .product-card img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            background: #eee;
+        }
+
+        .product-card .info {
+            padding: 1rem;
+        }
+
+        .product-card .name {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .product-card .price {
+            color: #e74c3c;
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .product-card .stock {
+            color: #888;
+            font-size: 0.85rem;
+            margin-top: 0.25rem;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: #1a1a2e;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            background: #16213e;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .modal-content h2 {
+            margin-bottom: 1rem;
+        }
+
+        .modal-content input {
+            width: 100%;
+            padding: 0.75rem;
+            margin-bottom: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+        }
+
+        .modal-content button {
+            width: 100%;
+        }
+
+        #message {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            display: none;
+            z-index: 200;
+        }
+
+        .msg-success {
+            background: #27ae60;
+            color: white;
+        }
+
+        .msg-error {
+            background: #e74c3c;
+            color: white;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>SHOP</h1>
+        <nav>
+            <a href="/" id="nav-home">홈</a>
+            <a href="/orders.html" id="nav-orders" style="display:none;">주문내역</a>
+            <a href="/admin.html" id="nav-admin" style="display:none;">관리자</a>
+            <a href="#" id="nav-login" onclick="showLogin()">로그인</a>
+            <a href="#" id="nav-logout" style="display:none;" onclick="logout()">로그아웃</a>
+        </nav>
+    </header>
+
+    <div class="container">
+        <div class="search-bar">
+            <input type="text" id="search-input" placeholder="상품 검색...">
+            <button onclick="searchProducts()">검색</button>
+        </div>
+        <div class="products" id="product-list"></div>
+    </div>
+
+    <!-- 로그인 모달 -->
+    <div class="modal" id="login-modal">
+        <div class="modal-content">
+            <h2>로그인</h2>
+            <input type="email" id="login-email" placeholder="이메일">
+            <input type="password" id="login-password" placeholder="비밀번호">
+            <button class="btn" onclick="doLogin()">로그인</button>
+            <p style="margin-top:1rem;text-align:center;">
+                <a href="#" onclick="showRegister()">회원가입</a>
+            </p>
+        </div>
+    </div>
+
+    <!-- 회원가입 모달 -->
+    <div class="modal" id="register-modal">
+        <div class="modal-content">
+            <h2>회원가입</h2>
+            <input type="text" id="reg-name" placeholder="이름">
+            <input type="email" id="reg-email" placeholder="이메일">
+            <input type="password" id="reg-password" placeholder="비밀번호">
+            <button class="btn" onclick="doRegister()">가입하기</button>
+        </div>
+    </div>
+
+    <div id="message"></div>
+
+    <script>
+        const API = '/api';
+        let token = localStorage.getItem('token');
+        let userRole = localStorage.getItem('role');
+
+        function updateNav() {
+            const isLoggedIn = !!token;
+            document.getElementById('nav-login').style.display = isLoggedIn ? 'none' : 'inline';
+            document.getElementById('nav-logout').style.display = isLoggedIn ? 'inline' : 'none';
+            document.getElementById('nav-orders').style.display = isLoggedIn ? 'inline' : 'none';
+            document.getElementById('nav-admin').style.display = userRole === 'admin' ? 'inline' : 'none';
+        }
+
+        function showMsg(text, type) {
+            const el = document.getElementById('message');
+            el.textContent = text;
+            el.className = type === 'error' ? 'msg-error' : 'msg-success';
+            el.style.display = 'block';
+            setTimeout(() => el.style.display = 'none', 3000);
+        }
+
+        function showLogin() { document.getElementById('login-modal').classList.add('active'); }
+        function showRegister() {
+            document.getElementById('login-modal').classList.remove('active');
+            document.getElementById('register-modal').classList.add('active');
+        }
+
+        document.querySelectorAll('.modal').forEach(m => {
+            m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); });
+        });
+
+        async function doLogin() {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            const res = await fetch(`${API}/auth/login`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                token = data.access_token;
+                userRole = data.role;
+                localStorage.setItem('token', token);
+                localStorage.setItem('role', userRole);
+                document.getElementById('login-modal').classList.remove('active');
+                updateNav();
+                showMsg('로그인 성공', 'success');
+            } else { showMsg('로그인 실패', 'error'); }
+        }
+
+        async function doRegister() {
+            const name = document.getElementById('reg-name').value;
+            const email = document.getElementById('reg-email').value;
+            const password = document.getElementById('reg-password').value;
+            const res = await fetch(`${API}/auth/register`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password, name })
+            });
+            if (res.ok) {
+                document.getElementById('register-modal').classList.remove('active');
+                showMsg('가입 완료! 로그인해주세요.', 'success');
+                showLogin();
+            } else { showMsg('가입 실패', 'error'); }
+        }
+
+        function logout() {
+            token = null; userRole = null;
+            localStorage.removeItem('token');
+            localStorage.removeItem('role');
+            updateNav();
+            showMsg('로그아웃 완료', 'success');
+        }
+
+        async function loadProducts(search = '') {
+            const url = search ? `${API}/products?search=${encodeURIComponent(search)}` : `${API}/products`;
+            const res = await fetch(url);
+            const data = await res.json();
+            const list = document.getElementById('product-list');
+            list.innerHTML = data.items.map(p => `
+                <div class="product-card">
+                    <img src="${p.image_url || '/static/placeholder.png'}" alt="${p.name}" onerror="this.style.background='#ddd'">
+                    <div class="info">
+                        <div class="name">${p.name}</div>
+                        <div class="price">${Number(p.price).toLocaleString()}원</div>
+                        <div class="stock">재고: ${p.stock}개</div>
+                        ${token ? `<button class="btn" style="margin-top:0.5rem;width:100%;" onclick="addToOrder(${p.id})">주문하기</button>` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function addToOrder(productId) {
+            const res = await fetch(`${API}/orders`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ items: [{ product_id: productId, quantity: 1 }] })
+            });
+            if (res.ok) { showMsg('주문 완료!', 'success'); loadProducts(); }
+            else { const err = await res.json(); showMsg(err.detail || '주문 실패', 'error'); }
+        }
+
+        function searchProducts() { loadProducts(document.getElementById('search-input').value); }
+        document.getElementById('search-input').addEventListener('keyup', e => { if (e.key === 'Enter') searchProducts(); });
+
+        updateNav();
+        loadProducts();
+    </script>
+</body>
+
+</html>

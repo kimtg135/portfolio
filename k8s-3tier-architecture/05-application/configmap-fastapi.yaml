@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fastapi-config
+  namespace: fastapi
+data:
+  APP_ENV: "production"
+  APP_HOST: "0.0.0.0"
+  APP_PORT: "8000"
+  # CORS 허용 (Nginx에서 프록시)
+  CORS_ORIGINS: "http://www.1st-project.local,http://localhost"

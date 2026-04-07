@@ -1,33 +1,40 @@
-# Kubernetes MySQL HA Infrastructure
+# Kubernetes 3-Tier Shopping Mall
 
-고가용성 MySQL Master-Slave 복제 구조 기반의 Kubernetes 인프라 프로젝트
+Kubernetes 기반 고가용성 3-Tier 쇼핑몰 인프라 프로젝트
+
+> 사용자: 회원가입/로그인, 상품 검색/조회, 주문  
+> 관리자: 상품 등록/삭제, 주문 상태 관리(확인/배송/취소)
 
 ## 아키텍처 개요
 
 ```
-                    ┌─────────────────────────────────────────────────┐
-                    │              Kubernetes Cluster                  │
-                    │                                                  │
-  Client ──────────┤  ┌──────────┐    ┌──────────────────────────┐   │
-  (Ingress)        │  │ MetalLB  │    │   Namespace: database    │   │
-                   │  │   L2     │    │                          │   │
-  ┌─────────┐     │  └──────────┘    │  ┌────────┐             │   │
-  │  Nginx  │─────┤                   │  │ Master │ (node-0)    │   │
-  │  :80    │     │  ┌──────────┐    │  │ MySQL  │             │   │
-  └─────────┘     │  │ProxySQL  │────┤  └───┬────┘             │   │
-                   │  │(R/W Split│    │      │ GTID Replication  │   │
-  ┌─────────┐     │  │ x2 Pods) │    │  ┌───┴────┐ ┌────────┐ │   │
-  │ FastAPI │─────┤  └──────────┘    │  │Slave-1 │ │Slave-2 │ │   │
-  │ :8000   │     │                   │  │(node-1)│ │(node-2)│ │   │
-  └─────────┘     │                   │  └────────┘ └────────┘ │   │
-                   │                   └──────────────────────────┘   │
-  ┌─────────┐     │                                                  │
-  │Grafana  │     │  ┌──────────────────────────────────┐           │
-  │Promethe │─────┤  │  NFS Storage (172.100.100.20)    │           │
-  └─────────┘     │  │  /nfs/database-1, database-2     │           │
-                   │  │  /nfs/nginx, fastapi, backup     │           │
-                   │  └──────────────────────────────────┘           │
-                    └─────────────────────────────────────────────────┘
+                    ┌──────────────────────────────────────────────────────┐
+                    │                  Kubernetes Cluster                   │
+                    │                                                      │
+  Client ──────────┤  ┌──────────┐                                        │
+  (Ingress)        │  │ MetalLB  │    ┌────────────────────────────────┐  │
+                   │  │   L2     │    │   Namespace: database          │  │
+  ┌──────────┐    │  └──────────┘    │                                │  │
+  │  Nginx   │    │                   │  ┌────────┐                   │  │
+  │ Frontend │────┤  ┌──────────┐    │  │ Master │ (node-0)          │  │
+  │  :80     │    │  │ FastAPI  │    │  │ MySQL  │                   │  │
+  └──────────┘    │  │ Shop API │    │  └───┬────┘                   │  │
+       │          │  │  :8000   │────┤      │ GTID Replication       │  │
+       │ /api/*   │  └──────────┘    │  ┌───┴────┐  ┌────────┐      │  │
+       └──────────┤       │          │  │Slave-1 │  │Slave-2 │      │  │
+                   │  ┌──────────┐    │  │(node-1)│  │(node-2)│      │  │
+                   │  │  Redis   │    │  └────────┘  └────────┘      │  │
+                   │  │ (Cache)  │    └────────────────────────────────┘  │
+                   │  └──────────┘                                        │
+  ┌──────────┐    │       │          ┌──────────┐                        │
+  │ Grafana  │    │  ┌──────────┐    │ProxySQL  │                        │
+  │Prometheus│────┤  │   NFS    │    │(R/W Split│                        │
+  └──────────┘    │  │ Storage  │    │ x2 Pods) │                        │
+                   │  └──────────┘    └──────────┘                        │
+                    └──────────────────────────────────────────────────────┘
+
+요청 흐름: Client → Nginx(:80) → /api/* → FastAPI(:8000) → ProxySQL → MySQL
+                                            ↕ Redis (세션/캐시)
 ```
 
 ## 기술 스택
@@ -43,7 +50,9 @@
 | **DNS** | BIND9 |
 | **Backup** | CronJob + mysqldump (일 1회, 7일 보관) |
 | **Security** | NetworkPolicy, Kubernetes Secret |
-| **Web** | Nginx, FastAPI |
+| **Frontend** | Nginx (Reverse Proxy + Static SPA) |
+| **Backend** | FastAPI (REST API, JWT Auth) |
+| **Cache** | Redis 7 (세션, 상품 캐시) |
 
 ## 프로젝트 구조
 
@@ -83,11 +92,27 @@ k8s-3tier-architecture/
 ├── 04-proxysql/                       # ProxySQL R/W 분리
 │   ├── configmap-proxysql.yaml        # 호스트그룹 + 쿼리 라우팅 설정
 │   └── proxysql-deploy-svc.yaml       # Deployment + Service (x2 Pods)
-├── 05-application/                    # Nginx, FastAPI
+├── 05-application/                    # 쇼핑몰 애플리케이션
+│   ├── configmap-nginx.yaml           # nginx.conf (Reverse Proxy → FastAPI)
+│   ├── configmap-fastapi.yaml         # 애플리케이션 환경 변수
 │   ├── secret-nginx.yaml
-│   ├── secret-fastapi.yaml
+│   ├── secret-fastapi.yaml            # DB 접속정보, JWT Secret
+│   ├── nginx-deploy-svc.yaml          # Nginx Deployment + ClusterIP
+│   ├── fastapi-deploy-svc.yaml        # FastAPI Deployment + ClusterIP
+│   ├── redis-deploy-svc.yaml          # Redis Deployment + ClusterIP
 │   ├── ingress-nginx.yaml             # www.1st-project.local
-│   └── ingress-fastapi.yaml           # api.1st-project.local
+│   ├── ingress-fastapi.yaml           # api.1st-project.local
+│   └── docker/                        # 커스텀 이미지 빌드
+│       ├── fastapi/                   # Shop API
+│       │   ├── Dockerfile
+│       │   ├── main.py                # FastAPI 쇼핑몰 API (인증/상품/주문/관리자)
+│       │   └── requirements.txt
+│       └── nginx/                     # Frontend
+│           ├── Dockerfile
+│           └── html/
+│               ├── index.html         # 메인 (상품 목록, 검색, 주문)
+│               ├── orders.html        # 주문 내역
+│               └── admin.html         # 관리자 대시보드
 ├── 06-monitoring/                     # Prometheus + Grafana
 │   ├── prometheus-deploy.yaml         # Prometheus + RBAC + ConfigMap
 │   ├── grafana-deploy.yaml            # Grafana + Datasource 자동 설정
@@ -178,21 +203,43 @@ kubectl exec -it -n database deploy/proxysql -- \
 
 ## 핵심 설계 포인트
 
-### 1. GTID 기반 MySQL 복제
+### 1. 3-Tier 쇼핑몰 아키텍처
+- **Nginx** → 정적 파일(SPA) 제공 + `/api/*` 요청을 FastAPI로 리버스 프록시
+- **FastAPI** → JWT 인증, 상품 CRUD, 주문 처리, Redis 캐싱
+- **MySQL** → Master-Slave GTID 복제, ProxySQL R/W 분리
+
+### 2. 쇼핑몰 API 엔드포인트
+
+| Method | Endpoint | 설명 | 권한 |
+|--------|----------|------|------|
+| POST | `/api/auth/register` | 회원가입 | 공개 |
+| POST | `/api/auth/login` | 로그인 (JWT 발급) | 공개 |
+| GET | `/api/products` | 상품 목록 (검색, 페이징) | 공개 |
+| GET | `/api/products/{id}` | 상품 상세 (Redis 캐시) | 공개 |
+| POST | `/api/orders` | 주문 생성 (재고 차감) | 사용자 |
+| GET | `/api/orders` | 내 주문 내역 | 사용자 |
+| POST | `/api/admin/products` | 상품 등록 | 관리자 |
+| PUT | `/api/admin/products/{id}` | 상품 수정 | 관리자 |
+| DELETE | `/api/admin/products/{id}` | 상품 삭제 (soft delete) | 관리자 |
+| GET | `/api/admin/orders` | 전체 주문 현황 | 관리자 |
+| PATCH | `/api/admin/orders/{id}` | 주문 상태 변경 | 관리자 |
+
+### 3. GTID 기반 MySQL 복제
 - `gtid_mode=ON`으로 트랜잭션 기반 자동 포지셔닝
 - Slave에서 `super_read_only=ON`으로 쓰기 방지
 - initContainer에서 `CHANGE REPLICATION SOURCE TO ... SOURCE_AUTO_POSITION=1`로 자동 복제 설정
 
-### 2. ProxySQL 읽기/쓰기 분리
+### 4. ProxySQL 읽기/쓰기 분리
 - `^SELECT` 쿼리 → Slave 호스트그룹 (읽기 분산)
 - `^INSERT|^UPDATE|^DELETE` → Master 호스트그룹
 - `podAntiAffinity`로 ProxySQL Pod 분산 배치
 
-### 3. NetworkPolicy 기반 보안
-- Database: Nginx, FastAPI, Monitoring 네임스페이스에서만 접근 허용
+### 5. NetworkPolicy 기반 보안
+- Database: FastAPI 네임스페이스에서만 접근 허용 (Nginx는 직접 DB 접근 불가)
+- Nginx → FastAPI → ProxySQL → MySQL 계층형 접근 제어
 - 내부 Master-Slave 통신 및 ProxySQL 트래픽 허용
 
-### 4. 자동 백업 및 보관
+### 6. 자동 백업 및 보관
 - CronJob으로 매일 02:00 Master DB 전체 백업
 - `--single-transaction`으로 Hot Backup
 - 7일 이상 오래된 백업 자동 삭제
