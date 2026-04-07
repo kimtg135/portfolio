@@ -1,0 +1,88 @@
+# FIX: Master 호스트를 K8s DNS로 변경 (기존 하드코딩 IP)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backup-script
+  namespace: database
+data:
+  backup.sh: |
+    #!/bin/bash
+    set -e
+
+    BACKUP_DIR="/backup"
+    MYSQL_HOST="mysql-master-svc.database.svc.cluster.local"
+    MYSQL_USER="root"
+    MYSQL_PASSWORD=$(cat /etc/mysql-secret/root-password)
+    BACKUP_DATE=$(date +%Y%m%d_%H%M%S)
+    BACKUP_FILE="${BACKUP_DIR}/mysql_backup_${BACKUP_DATE}.sql"
+
+    mkdir -p ${BACKUP_DIR}
+
+    echo "========================================"
+    echo "Starting MySQL backup at $(date)"
+    echo "========================================"
+
+    mysqldump -h ${MYSQL_HOST} -u ${MYSQL_USER} -p${MYSQL_PASSWORD} \
+      --all-databases \
+      --single-transaction \
+      --quick \
+      --lock-tables=false > ${BACKUP_FILE}
+
+    gzip ${BACKUP_FILE}
+
+    echo "Backup completed: ${BACKUP_FILE}.gz at $(date)"
+
+    # 7일 이상된 백업 삭제
+    find ${BACKUP_DIR} -type f -name "*.sql.gz" -mtime +7 -delete
+
+    echo "Old backups cleaned up"
+    echo "========================================"
+    ls -lh ${BACKUP_DIR} | tail -5
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: mysql-backup
+  namespace: database
+spec:
+  schedule: "0 2 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: default
+          containers:
+            - name: backup
+              image: mysql:8.0
+              command: ["/bin/bash"]
+              args: ["/backup-scripts/backup.sh"]
+              volumeMounts:
+                - name: backup-script
+                  mountPath: /backup-scripts
+                - name: backup-storage
+                  mountPath: /backup
+                - name: mysql-secret
+                  mountPath: /etc/mysql-secret
+                  readOnly: true
+              resources:
+                requests:
+                  memory: "256Mi"
+                  cpu: "250m"
+                limits:
+                  memory: "512Mi"
+                  cpu: "500m"
+          volumes:
+            - name: backup-script
+              configMap:
+                name: backup-script
+                defaultMode: 0755
+            - name: backup-storage
+              persistentVolumeClaim:
+                claimName: pvc-backup
+            - name: mysql-secret
+              secret:
+                secretName: database-secret-1
+          restartPolicy: OnFailure

@@ -1,0 +1,124 @@
+# FIX: initContainer로 복제 설정 + Health Check + Resource Limits 통합
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-slave-2-svc
+  namespace: database
+spec:
+  clusterIP: None
+  selector:
+    app: mysql-slave-2
+  ports:
+    - port: 3306
+      targetPort: 3306
+      name: mysql
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql-slave-2
+  namespace: database
+spec:
+  serviceName: mysql-slave-2-svc
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql-slave-2
+  template:
+    metadata:
+      labels:
+        app: mysql-slave-2
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - node-2
+      initContainers:
+        - name: init-replication
+          image: alpine:3.20
+          command:
+            - /bin/sh
+            - -c
+          args:
+            - apk add --no-cache gettext && envsubst < /tpl/repl.sql.tpl > /out/01-repl.sql
+          env:
+            - name: MASTER_HOST
+              value: "mysql-master-svc.database.svc.cluster.local"
+            - name: MASTER_PORT
+              value: "3306"
+            - name: REPL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: database-secret-2
+                  key: replication-user
+            - name: REPL_PW
+              valueFrom:
+                secretKeyRef:
+                  name: database-secret-2
+                  key: replication-password
+          volumeMounts:
+            - name: configmap
+              mountPath: /tpl
+            - name: init-out
+              mountPath: /out
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          ports:
+            - containerPort: 3306
+              name: mysql
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: database-secret-2
+                  key: root-password
+          volumeMounts:
+            - name: mysql-storage
+              mountPath: /var/lib/mysql
+            - name: init-out
+              mountPath: /docker-entrypoint-initdb.d
+            - name: configmap
+              mountPath: /etc/mysql/conf.d/my.cnf
+              subPath: my.cnf
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - mysqladmin ping -h localhost -u root -p${MYSQL_ROOT_PASSWORD}
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - mysql -h localhost -u root -p${MYSQL_ROOT_PASSWORD} -e "SELECT 1"
+            initialDelaySeconds: 30
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+      volumes:
+        - name: configmap
+          configMap:
+            name: configmap-slave-2
+        - name: init-out
+          emptyDir: {}
+        - name: mysql-storage
+          persistentVolumeClaim:
+            claimName: pvc-database-2

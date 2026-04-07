@@ -1,0 +1,16 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Secrets (실제 운영 시 Secret 파일은 Git에 올리지 마세요)
+# kubernetes/secret/*.yaml  # 포트폴리오용이므로 포함
+
+# Temp
+*.tmp
+*.bak

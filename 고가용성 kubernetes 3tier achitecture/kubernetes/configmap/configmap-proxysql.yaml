@@ -1,0 +1,77 @@
+# FIX: Master 호스트를 K8s DNS로 변경 (기존 172.100.100.30 하드코딩)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: proxysql-config
+  namespace: database
+data:
+  proxysql.cnf: |
+    datadir="/var/lib/proxysql"
+    errorlog="/var/log/proxysql/proxysql.log"
+
+    mysql_variables={
+      interfaces="0.0.0.0:6033"
+      max_connections=2000
+      default_query_timeout=10000
+      poll_timeout=2000
+      keep_multiplexing_variables="character_set_client,character_set_connection,collation_connection"
+    }
+
+    mysql_servers={
+      {
+        hostgroup_id=0
+        hostname="mysql-master-svc.database.svc.cluster.local"
+        port=3306
+        weight=1000
+        status="ONLINE"
+        max_connections=200
+      },
+      {
+        hostgroup_id=1
+        hostname="mysql-slave-1-svc.database.svc.cluster.local"
+        port=3306
+        weight=500
+        status="ONLINE"
+        max_connections=200
+      },
+      {
+        hostgroup_id=1
+        hostname="mysql-slave-2-svc.database.svc.cluster.local"
+        port=3306
+        weight=500
+        status="ONLINE"
+        max_connections=200
+      }
+    }
+
+    mysql_query_rules={
+      {
+        rule_id=1
+        match_pattern="^SELECT"
+        destination_hostgroup=1
+        apply=1
+        active=1
+      },
+      {
+        rule_id=2
+        match_pattern="^INSERT|^UPDATE|^DELETE|^CREATE|^ALTER"
+        destination_hostgroup=0
+        apply=1
+        active=1
+      }
+    }
+
+    mysql_users={
+      {
+        username="proxysql"
+        password="proxysql_pass"
+        active=1
+        default_hostgroup=0
+        max_connections=200
+      }
+    }
+
+    admin_variables={
+      admin_credentials="admin:admin"
+      mysql_ifaces="0.0.0.0:6032"
+    }

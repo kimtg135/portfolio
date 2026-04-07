@@ -1,0 +1,88 @@
+# FIX: monitoring 네임스페이스에서 database 접근 허용 추가 (Prometheus 스크래핑용)
+# FIX: database 내부 Pod 간 통신 허용 추가 (Master-Slave 복제용)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: database-ingress
+  namespace: database
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    # WordPress에서 DB 접근
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: wordpress
+      ports:
+        - protocol: TCP
+          port: 3306
+    # FastAPI에서 DB 접근
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: fastapi
+      ports:
+        - protocol: TCP
+          port: 3306
+    # Monitoring에서 DB 메트릭 수집
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 3306
+        - protocol: TCP
+          port: 9104
+    # Database 네임스페이스 내부 통신 (Master-Slave 복제)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: database
+      ports:
+        - protocol: TCP
+          port: 3306
+        - protocol: TCP
+          port: 6033
+        - protocol: TCP
+          port: 6032
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: wordpress-ingress
+  namespace: wordpress
+spec:
+  podSelector:
+    matchLabels:
+      app: wordpress
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: fastapi-ingress
+  namespace: fastapi
+spec:
+  podSelector:
+    matchLabels:
+      app: fastapi
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8000

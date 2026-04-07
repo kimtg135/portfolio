@@ -1,0 +1,109 @@
+# 개선된 버전 사용 (replicas: 2, podAntiAffinity, Health Check, ConfigMap 마운트)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: proxysql
+  namespace: database
+  labels:
+    app: proxysql
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: proxysql
+  template:
+    metadata:
+      labels:
+        app: proxysql
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - proxysql
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: proxysql
+          image: proxysql/proxysql:2.6.3
+          ports:
+            - containerPort: 6033
+              name: mysql
+            - containerPort: 6032
+              name: admin
+          volumeMounts:
+            - name: proxysql-config
+              mountPath: /etc/proxysql.cnf
+              subPath: proxysql.cnf
+            - name: proxysql-data
+              mountPath: /var/lib/proxysql
+          livenessProbe:
+            tcpSocket:
+              port: 6033
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - mysql -h localhost -P 6033 -u proxysql -pproxysql_pass -e "SELECT 1" || exit 1
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            failureThreshold: 2
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+      volumes:
+        - name: proxysql-config
+          configMap:
+            name: proxysql-config
+        - name: proxysql-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: proxysql-mysql-svc
+  namespace: database
+  labels:
+    app: proxysql
+spec:
+  type: ClusterIP
+  selector:
+    app: proxysql
+  ports:
+    - port: 3306
+      targetPort: 6033
+      name: mysql
+    - port: 6032
+      targetPort: 6032
+      name: admin
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: proxysql-mysql-lb
+  namespace: database
+  labels:
+    app: proxysql
+spec:
+  type: LoadBalancer
+  selector:
+    app: proxysql
+  loadBalancerIP: 172.100.100.101
+  ports:
+    - port: 3306
+      targetPort: 6033
+      protocol: TCP
+      name: mysql

@@ -1,0 +1,15 @@
+CREATE DATABASE IF NOT EXISTS wordpress_db;
+CREATE DATABASE IF NOT EXISTS fastapi_db;
+CREATE DATABASE IF NOT EXISTS slave_db;
+CREATE DATABASE IF NOT EXISTS proxy_db;
+CREATE DATABASE IF NOT EXISTS mot_db;
+
+-- FIX: 사용자명 통일 (기존: slave1234 생성 후 slave에 권한 부여 → 불일치)
+CREATE USER IF NOT EXISTS 'slave'@'%' IDENTIFIED BY 'slave1234';
+GRANT REPLICATION SLAVE ON *.* TO 'slave'@'%';
+
+CREATE USER IF NOT EXISTS 'app'@'%' IDENTIFIED BY 'app1234';
+GRANT ALL PRIVILEGES ON fastapi_db.* TO 'app'@'%';
+GRANT ALL PRIVILEGES ON wordpress_db.* TO 'app'@'%';
+
+FLUSH PRIVILEGES;

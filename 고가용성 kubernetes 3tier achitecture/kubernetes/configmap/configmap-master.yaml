@@ -1,0 +1,30 @@
+# FIX: 기존에 누락되었던 Master용 ConfigMap 추가
+# (statefulset-mysql-master가 configmap-master를 참조하지만 파일이 없었음)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: configmap-master
+  namespace: database
+data:
+  my.cnf: |
+    [mysqld]
+    server-id=100
+    log-bin=mysql-bin
+    binlog-format=ROW
+    gtid-mode=ON
+    enforce-gtid-consistency=ON
+    log-replica-updates=ON
+
+    skip-name-resolve=1
+    bind-address=0.0.0.0
+
+    max_connections=300
+    max_allowed_packet=256M
+    character-set-server=utf8mb4
+    collation-server=utf8mb4_unicode_ci
+    default-time-zone='+09:00'
+
+    slow_query_log=ON
+    slow_query_log_file=/var/log/mysql/slow-query.log
+    long_query_time=2
+    log-error=/var/log/mysql/error.log

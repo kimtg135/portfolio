@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-init-scripts
+  namespace: database
+data:
+  replication-setup.sql: |
+    -- 복제 사용자 생성
+    CREATE USER IF NOT EXISTS 'repl_user'@'%' IDENTIFIED BY 'Repl_Secure_Pass_456';
+    GRANT REPLICATION SLAVE ON *.* TO 'repl_user'@'%';
+    FLUSH PRIVILEGES;
+
+    -- 기본 데이터베이스 생성
+    CREATE DATABASE IF NOT EXISTS wordpress_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    CREATE DATABASE IF NOT EXISTS fastapi_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+    -- 애플리케이션 사용자 생성
+    CREATE USER IF NOT EXISTS 'wordpress_user'@'%' IDENTIFIED BY 'WordPress_Pass_789';
+    GRANT ALL PRIVILEGES ON wordpress_db.* TO 'wordpress_user'@'%';
+
+    CREATE USER IF NOT EXISTS 'fastapi_user'@'%' IDENTIFIED BY 'FastAPI_Pass_000';
+    GRANT ALL PRIVILEGES ON fastapi_db.* TO 'fastapi_user'@'%';
+
+    FLUSH PRIVILEGES;
+    SHOW MASTER STATUS;

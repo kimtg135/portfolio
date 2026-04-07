@@ -1,0 +1,16 @@
+$TTL 86400
+@   IN  SOA dns.1st-project.local. admin.1st-project.local. (
+        2026010801
+        3600
+        1800
+        604800
+        86400
+)
+
+    IN  NS   dns.1st-project.local.
+
+dns       IN    A    172.100.100.40
+db        IN    A    172.100.100.30
+nfs       IN    A    172.100.100.20
+www       IN    A    172.100.100.100
+@         IN    A    172.100.100.100

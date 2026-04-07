@@ -1,0 +1,16 @@
+# FIX: 이름 오타 수정 (faastapi-pvc → fastapi-pvc)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-fastapi
+  namespace: fastapi
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: nfs
+  resources:
+    requests:
+      storage: 10Gi
+  selector:
+    matchLabels:
+      pv: pv-fastapi
