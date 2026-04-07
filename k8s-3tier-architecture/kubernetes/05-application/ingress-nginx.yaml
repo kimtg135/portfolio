@@ -1,8 +1,8 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: wordpress-ingress
-  namespace: wordpress
+  name: nginx-ingress
+  namespace: nginx
 spec:
   ingressClassName: nginx
   rules:
@@ -13,6 +13,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: wordpress-svc
+                name: nginx-svc
                 port:
                   number: 80

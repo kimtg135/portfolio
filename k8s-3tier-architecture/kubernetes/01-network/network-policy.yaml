@@ -10,11 +10,11 @@ spec:
   policyTypes:
     - Ingress
   ingress:
-    # WordPress에서 DB 접근
+    # Nginx에서 DB 접근
     - from:
         - namespaceSelector:
             matchLabels:
-              name: wordpress
+              name: nginx
       ports:
         - protocol: TCP
           port: 3306
@@ -52,12 +52,12 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: wordpress-ingress
-  namespace: wordpress
+  name: nginx-ingress
+  namespace: nginx
 spec:
   podSelector:
     matchLabels:
-      app: wordpress
+      app: nginx
   policyTypes:
     - Ingress
   ingress:

@@ -15,9 +15,9 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: wordpress
+  name: nginx
   labels:
-    name: wordpress
+    name: nginx
 ---
 apiVersion: v1
 kind: Namespace

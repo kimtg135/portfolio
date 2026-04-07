@@ -9,7 +9,7 @@ kubectl label nodes node-1 kubernetes.io/hostname=node-1
 kubectl label nodes node-2 kubernetes.io/hostname=node-2
 
 # 2. NFS 저장소 준비
-sudo mkdir -p /nfs/{database-1,database-2,wordpress,fastapi,backup}
+sudo mkdir -p /nfs/{database-1,database-2,nginx,fastapi,backup}
 sudo chmod 777 /nfs/*
 
 # 3. NFS 내보내기 설정 (/etc/exports)
@@ -46,7 +46,7 @@ kubectl apply -f kubernetes/storage/
 kubectl get pv
 kubectl get pvc -n database
 kubectl get pvc -n fastapi
-kubectl get pvc -n wordpress
+kubectl get pvc -n nginx
 ```
 
 ## 4단계: MetalLB 설정

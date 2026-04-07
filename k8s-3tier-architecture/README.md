@@ -12,8 +12,8 @@
   (Ingress)        │  │ MetalLB  │    │   Namespace: database    │   │
                    │  │   L2     │    │                          │   │
   ┌─────────┐     │  └──────────┘    │  ┌────────┐             │   │
-  │WordPress│─────┤                   │  │ Master │ (node-0)    │   │
-  │ :80     │     │  ┌──────────┐    │  │ MySQL  │             │   │
+  │  Nginx  │─────┤                   │  │ Master │ (node-0)    │   │
+  │  :80    │     │  ┌──────────┐    │  │ MySQL  │             │   │
   └─────────┘     │  │ProxySQL  │────┤  └───┬────┘             │   │
                    │  │(R/W Split│    │      │ GTID Replication  │   │
   ┌─────────┐     │  │ x2 Pods) │    │  ┌───┴────┐ ┌────────┐ │   │
@@ -25,7 +25,7 @@
   │Grafana  │     │  ┌──────────────────────────────────┐           │
   │Promethe │─────┤  │  NFS Storage (172.100.100.20)    │           │
   └─────────┘     │  │  /nfs/database-1, database-2     │           │
-                   │  │  /nfs/wordpress, fastapi, backup │           │
+                   │  │  /nfs/nginx, fastapi, backup     │           │
                    │  └──────────────────────────────────┘           │
                     └─────────────────────────────────────────────────┘
 ```
@@ -43,7 +43,7 @@
 | **DNS** | BIND9 |
 | **Backup** | CronJob + mysqldump (일 1회, 7일 보관) |
 | **Security** | NetworkPolicy, Kubernetes Secret |
-| **Web** | WordPress, FastAPI |
+| **Web** | Nginx, FastAPI |
 
 ## 프로젝트 구조
 
@@ -64,7 +64,7 @@
     ├── metallb/                   # MetalLB 로드밸런서 설정
     │   └── metallb.yaml
     ├── namespace/                 # 네임스페이스 정의
-    │   └── namespace-all.yaml     # database, fastapi, wordpress, monitoring
+    │   └── namespace-all.yaml     # database, fastapi, nginx, monitoring
     ├── configmap/                 # ConfigMap
     │   ├── configmap-master.yaml  # MySQL Master 설정
     │   ├── configmap-slave-1.yaml # Slave-1 설정 + 복제 템플릿
@@ -74,17 +74,17 @@
     ├── secret/                    # Secret (운영 시 sealed-secrets 권장)
     │   ├── secret-database.yaml
     │   ├── secret-fastapi.yaml
-    │   └── secret-wordpress.yaml
+    │   └── secret-nginx.yaml
     ├── storage/                   # PersistentVolume & Claim
     │   ├── pv-database-1.yaml
     │   ├── pv-database-2.yaml
+    │   ├── pv-nginx.yaml
     │   ├── pv-fastapi.yaml
-    │   ├── pv-wordpress.yaml
     │   ├── pv-backup.yaml
     │   ├── pvc-database-1.yaml
     │   ├── pvc-database-2.yaml
     │   ├── pvc-fastapi.yaml
-    │   ├── pvc-wordpress.yaml
+    │   ├── pvc-nginx.yaml
     │   └── pvc-backup.yaml
     ├── statefulset/               # MySQL StatefulSet (Master + Slave x2)
     │   ├── mysql-master.yaml      # Master (node-0)
@@ -95,7 +95,7 @@
     ├── ingress/                   # Ingress 규칙
     │   ├── ingress-fastapi.yaml
     │   ├── ingress-monitoring.yaml
-    │   └── ingress-wordpress.yaml
+    │   └── ingress-nginx.yaml
     ├── monitoring/                # 모니터링 스택
     │   ├── prometheus-deploy.yaml # Prometheus + RBAC + ConfigMap
     │   └── grafana-deploy.yaml    # Grafana + Datasource 자동 설정
@@ -116,7 +116,7 @@ kubectl label nodes node-1 kubernetes.io/hostname=node-1
 kubectl label nodes node-2 kubernetes.io/hostname=node-2
 
 # 2. NFS 저장소 준비
-sudo mkdir -p /nfs/{database-1,database-2,wordpress,fastapi,backup}
+sudo mkdir -p /nfs/{database-1,database-2,nginx,fastapi,backup}
 sudo chmod 777 /nfs/*
 
 # 3. NFS 내보내기 설정 (/etc/exports)
@@ -195,7 +195,7 @@ kubectl exec -it -n database deploy/proxysql -- \
 - `podAntiAffinity`로 ProxySQL Pod 분산 배치
 
 ### 3. NetworkPolicy 기반 보안
-- Database: WordPress, FastAPI, Monitoring 네임스페이스에서만 접근 허용
+- Database: Nginx, FastAPI, Monitoring 네임스페이스에서만 접근 허용
 - 내부 Master-Slave 통신 및 ProxySQL 트래픽 허용
 
 ### 4. 자동 백업 및 보관
