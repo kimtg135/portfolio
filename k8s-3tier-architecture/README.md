@@ -48,61 +48,56 @@
 ## 프로젝트 구조
 
 ```
-├── docs/                          # 문서
-│   └── analysis-report.md         # 인프라 분석 보고서 (발견 문제점 및 해결)
-├── docker/                        # Docker 이미지 빌드
-│   ├── Dockerfile                 # MySQL 커스텀 이미지
-│   ├── docker-compose.yaml        # 로컬 개발용 MySQL + Redis
-│   ├── my.cnf                     # MySQL Master 설정
-│   └── init.d/
-│       └── user-setup.sql         # 초기 DB/사용자 생성 SQL
-├── dns/                           # DNS 설정 (BIND9)
-│   ├── db.1st-project.local       # 존 파일 (A 레코드)
-│   ├── named.conf.local           # 존 정의
-│   └── named.conf.options         # DNS 옵션 및 포워더
-└── kubernetes/                    # Kubernetes 매니페스트
-    ├── metallb/                   # MetalLB 로드밸런서 설정
-    │   └── metallb.yaml
-    ├── namespace/                 # 네임스페이스 정의
-    │   └── namespace-all.yaml     # database, fastapi, nginx, monitoring
-    ├── configmap/                 # ConfigMap
-    │   ├── configmap-master.yaml  # MySQL Master 설정
-    │   ├── configmap-slave-1.yaml # Slave-1 설정 + 복제 템플릿
-    │   ├── configmap-slave-2.yaml # Slave-2 설정 + 복제 템플릿
-    │   ├── configmap-init-scripts.yaml  # DB 초기화 SQL
-    │   └── configmap-proxysql.yaml      # ProxySQL R/W 분리 설정
-    ├── secret/                    # Secret (운영 시 sealed-secrets 권장)
-    │   ├── secret-database.yaml
-    │   ├── secret-fastapi.yaml
-    │   └── secret-nginx.yaml
-    ├── storage/                   # PersistentVolume & Claim
-    │   ├── pv-database-1.yaml
-    │   ├── pv-database-2.yaml
-    │   ├── pv-nginx.yaml
-    │   ├── pv-fastapi.yaml
-    │   ├── pv-backup.yaml
-    │   ├── pvc-database-1.yaml
-    │   ├── pvc-database-2.yaml
-    │   ├── pvc-fastapi.yaml
-    │   ├── pvc-nginx.yaml
-    │   └── pvc-backup.yaml
-    ├── statefulset/               # MySQL StatefulSet (Master + Slave x2)
-    │   ├── mysql-master.yaml      # Master (node-0)
-    │   ├── mysql-slave-1.yaml     # Slave-1 (node-1) + initContainer 복제 설정
-    │   └── mysql-slave-2.yaml     # Slave-2 (node-2) + initContainer 복제 설정
-    ├── proxysql/                  # ProxySQL Deployment + Service
-    │   └── proxysql-deploy-svc.yaml
-    ├── ingress/                   # Ingress 규칙
-    │   ├── ingress-fastapi.yaml
-    │   ├── ingress-monitoring.yaml
-    │   └── ingress-nginx.yaml
-    ├── monitoring/                # 모니터링 스택
-    │   ├── prometheus-deploy.yaml # Prometheus + RBAC + ConfigMap
-    │   └── grafana-deploy.yaml    # Grafana + Datasource 자동 설정
-    ├── backup/                    # 백업
-    │   └── backup-cronjob.yaml    # 일일 02:00 mysqldump, 7일 보관
-    └── security/                  # 보안 정책
-        └── network-policy.yaml    # 네임스페이스 간 접근 제어
+k8s-3tier-architecture/
+├── 00-namespace/                      # 네임스페이스 정의
+│   └── namespace-all.yaml             # database, fastapi, nginx, monitoring
+├── 01-network/                        # 네트워크 인프라
+│   ├── metallb.yaml                   # MetalLB L2 로드밸런서
+│   ├── network-policy.yaml            # 네임스페이스 간 접근 제어
+│   └── dns/                           # BIND9 DNS 설정
+│       ├── db.1st-project.local       # 존 파일 (A 레코드)
+│       ├── named.conf.local           # 존 정의
+│       └── named.conf.options         # DNS 옵션 및 포워더
+├── 02-storage/                        # PersistentVolume & Claim (NFS)
+│   ├── pv-database-1.yaml
+│   ├── pv-database-2.yaml
+│   ├── pv-nginx.yaml
+│   ├── pv-fastapi.yaml
+│   ├── pv-backup.yaml
+│   └── pvc-*.yaml                     # 각 PV에 대응하는 PVC
+├── 03-database/                       # MySQL Master-Slave (GTID)
+│   ├── configmap-master.yaml          # Master my.cnf
+│   ├── configmap-slave-1.yaml         # Slave-1 설정 + 복제 템플릿
+│   ├── configmap-slave-2.yaml         # Slave-2 설정 + 복제 템플릿
+│   ├── configmap-init-scripts.yaml    # DB/사용자 초기화 SQL
+│   ├── secret-database.yaml           # DB 인증 정보
+│   ├── mysql-master.yaml              # Master StatefulSet (node-0)
+│   ├── mysql-slave-1.yaml             # Slave-1 StatefulSet (node-1)
+│   ├── mysql-slave-2.yaml             # Slave-2 StatefulSet (node-2)
+│   └── docker/                        # MySQL 커스텀 이미지 빌드
+│       ├── Dockerfile
+│       ├── docker-compose.yaml        # 로컬 개발용 MySQL + Redis
+│       ├── my.cnf
+│       └── init.d/
+│           └── user-setup.sql
+├── 04-proxysql/                       # ProxySQL R/W 분리
+│   ├── configmap-proxysql.yaml        # 호스트그룹 + 쿼리 라우팅 설정
+│   └── proxysql-deploy-svc.yaml       # Deployment + Service (x2 Pods)
+├── 05-application/                    # Nginx, FastAPI
+│   ├── secret-nginx.yaml
+│   ├── secret-fastapi.yaml
+│   ├── ingress-nginx.yaml             # www.1st-project.local
+│   └── ingress-fastapi.yaml           # api.1st-project.local
+├── 06-monitoring/                     # Prometheus + Grafana
+│   ├── prometheus-deploy.yaml         # Prometheus + RBAC + ConfigMap
+│   ├── grafana-deploy.yaml            # Grafana + Datasource 자동 설정
+│   └── ingress-monitoring.yaml        # monitoring.1st-project.local
+├── 07-backup/                         # 자동 백업
+│   └── backup-cronjob.yaml            # 매일 02:00 mysqldump, 7일 보관
+├── docs/                              # 문서
+│   ├── analysis-report.md             # 인프라 분석 보고서
+│   └── deployment-guide.md            # 배포 가이드
+└── README.md
 ```
 
 ## 배포 가이드
@@ -128,40 +123,39 @@ sudo exportfs -ra
 
 ```bash
 # 1. 네임스페이스
-kubectl apply -f kubernetes/namespace/
+kubectl apply -f 00-namespace/
 
-# 2. ConfigMap & Secret
-kubectl apply -f kubernetes/configmap/
-kubectl apply -f kubernetes/secret/
+# 2. 네트워크 (MetalLB + NetworkPolicy)
+kubectl apply -f 01-network/metallb.yaml
+kubectl apply -f 01-network/network-policy.yaml
 
 # 3. 스토리지 (PV → PVC)
-kubectl apply -f kubernetes/storage/
+kubectl apply -f 02-storage/
 
-# 4. MetalLB
-kubectl apply -f kubernetes/metallb/
-
-# 5. MySQL Master (먼저 배포 후 Ready 대기)
-kubectl apply -f kubernetes/statefulset/mysql-master.yaml
+# 4. MySQL Master (먼저 배포 후 Ready 대기)
+kubectl apply -f 03-database/configmap-master.yaml
+kubectl apply -f 03-database/configmap-init-scripts.yaml
+kubectl apply -f 03-database/secret-database.yaml
+kubectl apply -f 03-database/mysql-master.yaml
 kubectl wait --for=condition=ready pod -l app=mysql-master -n database --timeout=300s
 
-# 6. MySQL Slaves
-kubectl apply -f kubernetes/statefulset/mysql-slave-1.yaml
-kubectl apply -f kubernetes/statefulset/mysql-slave-2.yaml
+# 5. MySQL Slaves
+kubectl apply -f 03-database/configmap-slave-1.yaml
+kubectl apply -f 03-database/configmap-slave-2.yaml
+kubectl apply -f 03-database/mysql-slave-1.yaml
+kubectl apply -f 03-database/mysql-slave-2.yaml
 
-# 7. ProxySQL
-kubectl apply -f kubernetes/proxysql/
+# 6. ProxySQL
+kubectl apply -f 04-proxysql/
 
-# 8. 보안 정책
-kubectl apply -f kubernetes/security/
+# 7. Application (Nginx + FastAPI)
+kubectl apply -f 05-application/
 
-# 9. 모니터링
-kubectl apply -f kubernetes/monitoring/
+# 8. 모니터링
+kubectl apply -f 06-monitoring/
 
-# 10. Ingress
-kubectl apply -f kubernetes/ingress/
-
-# 11. 백업 CronJob
-kubectl apply -f kubernetes/backup/
+# 9. 백업 CronJob
+kubectl apply -f 07-backup/
 ```
 
 ### 배포 검증

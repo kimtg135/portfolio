@@ -15,18 +15,15 @@ DevOps/인프라 엔지니어 포트폴리오입니다.
 ```
 portfolio/
 ├── k8s-3tier-architecture/          # 고가용성 K8s 3-Tier 인프라
-│   ├── dns/                         # BIND9 DNS 설정
-│   ├── docker/                      # Docker 이미지 빌드
-│   ├── docs/                        # 분석 보고서, 배포 가이드
-│   └── kubernetes/                  # K8s 매니페스트
-│       ├── 00-namespace/
-│       ├── 01-network/              # MetalLB, NetworkPolicy
-│       ├── 02-storage/              # PV/PVC (NFS)
-│       ├── 03-database/             # MySQL Master-Slave (GTID)
-│       ├── 04-proxysql/             # R/W 분리
-│       ├── 05-application/          # Nginx, FastAPI
-│       ├── 06-monitoring/           # Prometheus, Grafana
-│       └── 07-backup/               # CronJob 백업
+│   ├── 00-namespace/                # 네임스페이스 정의
+│   ├── 01-network/                  # MetalLB, NetworkPolicy, DNS
+│   ├── 02-storage/                  # PV/PVC (NFS)
+│   ├── 03-database/                 # MySQL Master-Slave (GTID) + Docker
+│   ├── 04-proxysql/                 # R/W 분리
+│   ├── 05-application/              # Nginx, FastAPI
+│   ├── 06-monitoring/               # Prometheus, Grafana
+│   ├── 07-backup/                   # CronJob 백업
+│   └── docs/                        # 분석 보고서, 배포 가이드
 │
 └── rocket-farm_project/             # AWS EKS 인프라
     ├── EKS- PR/                     # EKS 클러스터 Terraform
